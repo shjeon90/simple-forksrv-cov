@@ -4,7 +4,8 @@
 #include <sanitizer/coverage_interface.h>
 
 int shm_id;
-char* trace_bits;
+char initial_bitmap[MAP_SIZE];
+char* trace_bits = initial_bitmap;
 
 void init_shm() {
     char* shm_str = getenv(SHM_ENV_VAR);
@@ -79,5 +80,8 @@ void __sanitizer_cov_trace_pc_guard_init(
 void __sanitizer_cov_trace_pc_guard (
     uint32_t *guard
 ) {
+    if (shm_id) {
+
+    }
     trace_bits[*guard]++;
 }

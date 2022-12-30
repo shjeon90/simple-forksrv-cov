@@ -4,7 +4,7 @@ It is originated from AFL's LLVM mode.
 I hope it will be useful to someone trying to implement something similar.
 
 ## Usage
-```Bash
+```Shell
 $ clang -c compiler-rt.c
 $ ls
 compiler-rt.o ...

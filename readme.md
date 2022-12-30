@@ -5,14 +5,8 @@ I hope it will be useful to someone trying to implement something similar.
 
 ## Usage
 ```Shell
-$ clang -c compiler-rt.c
+$ make
 $ ls
-compiler-rt.o ...
-$ clang -g -fsanitize-coverage=trace-pc-guard compiler-rt.o target.c -o target
-$ ls
-target compiler-rt.o ...
-$ clang -o fuzz-tem fuzz-tem.c
-$ ls
-fuzz-tem target compiler-rt.o ...
-$ ./fuzz-tem ./target
+compiler-rt.o rs-clang-fast ...
+$ ./rs-clang-fast target.c -o target
 ```

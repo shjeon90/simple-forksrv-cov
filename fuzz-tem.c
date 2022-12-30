@@ -41,6 +41,7 @@ void init_shm() {
 }
 
 void init_forkserver(char* argv[]) {
+    int status;
     int st_pipe[2], ctl_pipe[2];
     static struct itimerval it;
 
@@ -71,50 +72,46 @@ void init_forkserver(char* argv[]) {
 
     fsrv_read = st_pipe[0];
     fsrv_write = ctl_pipe[1];
+
+    // check forkserver was up
+    if (read(fsrv_read, &status, sizeof(int)) != sizeof(int)) exit(1);
 }
 
 static void handle_stop_sig(int sig) {
-    if (child_pid > 0) kill(child_pid, SIGKILL);
-    if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
+  if (child_pid > 0) kill(child_pid, SIGKILL);
+  if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
 
-    // better idea?
-    exit(0);
+  exit(0);
 }
 
 void setup_signal_handlers() {
     signal(SIGINT, handle_stop_sig);
     signal(SIGTERM, handle_stop_sig);
     signal(SIGHUP, handle_stop_sig);
-
     signal(SIGALRM, handle_stop_sig);
 }
 
 void run_target() {
-    int tmp;
     int do_fork;
-    int cnt = 0;
     pid_t child_pid;
+    int status;
 
-    // check forkserver was up
-    if (read(fsrv_read, &tmp, sizeof(int)) != sizeof(int)) exit(1);
+    memset(trace_bits, 0, MAP_SIZE);
 
-    while (1) {
-        int status;
+    // make fuzz target
+    printf("tell forksrv to spawn a fuzz target\n");
+    if (write(fsrv_write, &do_fork, sizeof(int)) != sizeof(int)) exit(1);
 
-        // make fuzz target
-        printf("tell forksrv to spawn a fuzz target\n");
-        if (write(fsrv_write, &do_fork, sizeof(int)) != sizeof(int)) exit(1);
+    // read child_pid
+    if (read(fsrv_read, &child_pid, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
+    printf("pid fuzz target: %d\n", child_pid);
 
-        // read child_pid
-        if (read(fsrv_read, &child_pid, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
-        printf("pid fuzz target: %d\n", child_pid);
+    // do fuzz stuff?
 
-        //read exit status of fuzz target
-        if (read(fsrv_read, &status, sizeof(int)) != sizeof(int)) exit(1);
-        printf("exit fuzz target: %d\n", status);
-        cnt++;
+    //read exit status of fuzz target
+    if (read(fsrv_read, &status, sizeof(int)) != sizeof(int)) exit(1);
+    printf("exit fuzz target: %d\n", status);
         
-    }
 }
 
 int main(int argc, char* argv[]) {

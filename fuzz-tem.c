@@ -8,6 +8,16 @@ int exec_tmout = EXEC_TIMEOUT;
 int fsrv_read;
 int fsrv_write;
 
+void simle_checksum() {
+    unsigned int checksum = 0;
+
+    for (int i = 0;i < MAP_SIZE;++i) {
+        checksum += trace_bits[i];
+    }
+
+    printf("checksum: %u\n", checksum);
+}
+
 void remove_shm() {
     printf("remove shared memory\n");
     shmctl(shm_id, IPC_RMID, NULL);
@@ -134,6 +144,7 @@ int main(int argc, char* argv[]) {
 
     while (1) {
         run_target();
+        simle_checksum();
     }
 
     return 0;

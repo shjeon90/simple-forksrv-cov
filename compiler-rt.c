@@ -3,13 +3,14 @@
 #include <stdint.h>
 #include <sanitizer/coverage_interface.h>
 
+int shm_id;
 char* trace_bits;
 
 void init_shm() {
     char* shm_str = getenv(SHM_ENV_VAR);
 
     if (shm_str) {
-        int shm_id = atoi(shm_str);
+        shm_id = atoi(shm_str);
         trace_bits = shmat(shm_id, NULL, 0);
 
         if (trace_bits == (void*)-1) {
@@ -38,6 +39,7 @@ void init_forkserver() {
             perror("forkserver failed");
             exit(1);
         } else if (child_pid == 0) {  // target instance
+            // spawn a fuzz target
             close(FORKSRV_FD);
             close(FORKSRV_FD+1);
 
@@ -46,6 +48,7 @@ void init_forkserver() {
 
             if(write(FORKSRV_FD+1, &child_pid, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
 
+            // wait until the fuzz target is dead
             waitpid(child_pid, &status, 0);
             printf("terminated child: %d (%d)\n", child_pid, WEXITSTATUS(status));
             
@@ -73,7 +76,7 @@ void __sanitizer_cov_trace_pc_guard_init(
     }
 }
 
-void __sanitizer_cov_trace_pd_guard (
+void __sanitizer_cov_trace_pc_guard (
     uint32_t *guard
 ) {
     trace_bits[*guard]++;

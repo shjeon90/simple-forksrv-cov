@@ -4,6 +4,9 @@ int shm_id;
 char* trace_bits;
 pid_t child_pid;
 pid_t forksrv_pid;
+int exec_tmout = EXEC_TIMEOUT;
+int fsrv_read;
+int fsrv_write;
 
 void remove_shm() {
     printf("remove shared memory\n");
@@ -39,6 +42,7 @@ void init_shm() {
 
 void init_forkserver(char* argv[]) {
     int st_pipe[2], ctl_pipe[2];
+    static struct itimerval it;
 
     if (pipe(st_pipe) || pipe(ctl_pipe)) {
         perror("pipe() failed");
@@ -63,55 +67,54 @@ void init_forkserver(char* argv[]) {
         close(st_pipe[0]);
 
         execvp(argv[0], argv);
-    } else {                        // fuzzer
-        int tmp;
-        int do_fork;
-        int cnt = 0;
-        pid_t child_pid;
-
-        // check forkserver was up
-        if (read(st_pipe[0], &tmp, sizeof(int)) != sizeof(int)) exit(1);
-
-        while (1) {
-            int status;
-
-            // make fuzz target
-            printf("tell forksrv to spawn a fuzz target\n");
-            if (write(ctl_pipe[1], &do_fork, sizeof(int)) != sizeof(int)) exit(1);
-
-            // read child_pid
-            if (read(st_pipe[0], &child_pid, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
-            printf("pid fuzz target: %d\n", child_pid);
-
-            //read exit status of fuzz target
-            if (read(st_pipe[0], &status, sizeof(int)) != sizeof(int)) exit(1);
-            printf("exit fuzz target: %d\n", status);
-            cnt++;
-            
-        }
     }
+
+    fsrv_read = st_pipe[0];
+    fsrv_write = ctl_pipe[1];
 }
 
 static void handle_stop_sig(int sig) {
+    if (child_pid > 0) kill(child_pid, SIGKILL);
+    if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
 
-  if (child_pid > 0) kill(child_pid, SIGKILL);
-  if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
-
+    // better idea?
+    exit(0);
 }
 
 void setup_signal_handlers() {
-    struct sigaction sa;
+    signal(SIGINT, handle_stop_sig);
+    signal(SIGTERM, handle_stop_sig);
+    signal(SIGHUP, handle_stop_sig);
 
-    sa.sa_handler = NULL;
-    sa.sa_flags = SA_RESTART;
-    sa.sa_sigaction = NULL;
+    signal(SIGALRM, handle_stop_sig);
+}
 
-    sigemptyset(&sa.sa_mask);
+void run_target() {
+    int tmp;
+    int do_fork;
+    int cnt = 0;
+    pid_t child_pid;
 
-    sa.sa_handler = handle_stop_sig;
-    sigaction(SIGHUP, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
+    // check forkserver was up
+    if (read(fsrv_read, &tmp, sizeof(int)) != sizeof(int)) exit(1);
+
+    while (1) {
+        int status;
+
+        // make fuzz target
+        printf("tell forksrv to spawn a fuzz target\n");
+        if (write(fsrv_write, &do_fork, sizeof(int)) != sizeof(int)) exit(1);
+
+        // read child_pid
+        if (read(fsrv_read, &child_pid, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
+        printf("pid fuzz target: %d\n", child_pid);
+
+        //read exit status of fuzz target
+        if (read(fsrv_read, &status, sizeof(int)) != sizeof(int)) exit(1);
+        printf("exit fuzz target: %d\n", status);
+        cnt++;
+        
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -127,8 +130,14 @@ int main(int argc, char* argv[]) {
         pargv[i] = argv[i+1];
     }
 
+    setup_signal_handlers();
+
     init_shm();
     init_forkserver(pargv);
+
+    while (1) {
+        run_target();
+    }
 
     return 0;
 }

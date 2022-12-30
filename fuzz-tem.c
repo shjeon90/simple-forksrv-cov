@@ -2,6 +2,8 @@
 
 int shm_id;
 char* trace_bits;
+pid_t child_pid;
+pid_t forksrv_pid;
 
 void remove_shm() {
     printf("remove shared memory\n");
@@ -36,7 +38,6 @@ void init_shm() {
 }
 
 void init_forkserver(char* argv[]) {
-    pid_t child_pid;
     int st_pipe[2], ctl_pipe[2];
 
     if (pipe(st_pipe) || pipe(ctl_pipe)) {
@@ -44,12 +45,12 @@ void init_forkserver(char* argv[]) {
         exit(1);
     }
 
-    child_pid = fork();
-    if (child_pid < 0) {
+    forksrv_pid = fork();
+    if (forksrv_pid < 0) {
         perror("fork() failed");
 
         exit(1);
-    } else if (child_pid == 0) {    // forkserver
+    } else if (forksrv_pid == 0) {    // forkserver
         int dev_null_fd = open("/dev/null", O_RDWR);
 
         dup2(dev_null_fd, STDOUT_FILENO);
@@ -66,12 +67,12 @@ void init_forkserver(char* argv[]) {
         int tmp;
         int do_fork;
         int cnt = 0;
+        pid_t child_pid;
 
         // check forkserver was up
         if (read(st_pipe[0], &tmp, sizeof(int)) != sizeof(int)) exit(1);
 
         while (1) {
-            pid_t pid_fuzz_target;
             int status;
 
             // make fuzz target
@@ -79,8 +80,8 @@ void init_forkserver(char* argv[]) {
             if (write(ctl_pipe[1], &do_fork, sizeof(int)) != sizeof(int)) exit(1);
 
             // read child_pid
-            if (read(st_pipe[0], &pid_fuzz_target, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
-            printf("pid fuzz target: %d\n", pid_fuzz_target);
+            if (read(st_pipe[0], &child_pid, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
+            printf("pid fuzz target: %d\n", child_pid);
 
             //read exit status of fuzz target
             if (read(st_pipe[0], &status, sizeof(int)) != sizeof(int)) exit(1);
@@ -89,6 +90,28 @@ void init_forkserver(char* argv[]) {
             
         }
     }
+}
+
+static void handle_stop_sig(int sig) {
+
+  if (child_pid > 0) kill(child_pid, SIGKILL);
+  if (forksrv_pid > 0) kill(forksrv_pid, SIGKILL);
+
+}
+
+void setup_signal_handlers() {
+    struct sigaction sa;
+
+    sa.sa_handler = NULL;
+    sa.sa_flags = SA_RESTART;
+    sa.sa_sigaction = NULL;
+
+    sigemptyset(&sa.sa_mask);
+
+    sa.sa_handler = handle_stop_sig;
+    sigaction(SIGHUP, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 }
 
 int main(int argc, char* argv[]) {

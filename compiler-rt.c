@@ -1,5 +1,8 @@
 #include "config.h"
 
+#include <stdint.h>
+#include <sanitizer/coverage_interface.h>
+
 char* trace_bits;
 
 void init_shm() {
@@ -13,8 +16,6 @@ void init_shm() {
             perror("shmat() failed");
             exit(1);
         }
-
-
     }
 }
 
@@ -57,3 +58,20 @@ __attribute__((constructor)) void init_fuzz() {
     init_forkserver();
 }
 
+void __sanitizer_cov_trace_pc_guard_init(
+    uint32_t *start,
+    uint32_t *stop
+) {
+    if (start == stop || *start) return;
+
+    while (start < stop) {
+        *start = 0;
+        start++;
+    }
+}
+
+void __sanitizer_cov_trace_pd_guard (
+    uint32_t *guard
+) {
+    trace_bits[*guard]++;
+}

@@ -8,7 +8,7 @@ I hope it will be useful to someone trying to implement something similar.
 $ clang -c compiler-rt.c
 $ ls
 compiler-rt.o ...
-$ clang compiler-rt.o target.c -o target
+$ clang -g -fsanitize-coverage=trace-pc-guard compiler-rt.o target.c -o target
 $ ls
 target compiler-rt.o ...
 $ clang -o fuzz-tem fuzz-tem.c

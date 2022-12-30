@@ -72,6 +72,7 @@ void init_forkserver(char* argv[]) {
 
         while (1) {
             pid_t pid_fuzz_target;
+            int status;
 
             // make fuzz target
             printf("tell forksrv to spawn a fuzz target\n");
@@ -80,6 +81,10 @@ void init_forkserver(char* argv[]) {
             // read child_pid
             if (read(st_pipe[0], &pid_fuzz_target, sizeof(pid_t)) != sizeof(pid_t)) exit(1);
             printf("pid fuzz target: %d\n", pid_fuzz_target);
+
+            //read exit status of fuzz target
+            if (read(st_pipe[0], &status, sizeof(int)) != sizeof(int)) exit(1);
+            printf("exit fuzz target: %d\n", status);
             cnt++;
             
         }

@@ -48,6 +48,9 @@ void init_forkserver() {
 
             waitpid(child_pid, &status, 0);
             printf("terminated child: %d (%d)\n", child_pid, WEXITSTATUS(status));
+            
+            // tell child's status to fuzzer.
+            if(write(FORKSRV_FD+1, &status, sizeof(int)) != sizeof(int)) exit(1);
         }
     }
 }

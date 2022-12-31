@@ -5,11 +5,30 @@
 
 char** cc_params;
 unsigned int cc_par_cnt = 1;
+char* path_compiler_rt;
 
-void find_obj() {
-    if (access("compiler-rt.o", F_OK)) {
-        perror("compiler-rt.o does not exist in current directory.");
-        exit(1);
+void find_obj(char* arg0) {
+    char* slash;
+
+    slash = strrchr(arg0, '/');
+    if (slash) {
+        char* dir;
+
+        *slash = '\0';
+        dir = (char*)malloc(strlen(arg0) + 16);
+        memset(dir, 0, strlen(arg0) + 16);
+        strcpy(dir, arg0);
+        *slash = '/';
+
+        strcat(dir, "/compiler-rt.o");
+
+        if (access(dir, F_OK)) {
+            free(dir);
+            perror("compiler-rt.o does not exist.");
+            exit(1);
+        }
+
+        path_compiler_rt = dir;
     }
 }
 
@@ -33,7 +52,7 @@ void edit_params (int argc, char* argv[]) {
         cc_params[cc_par_cnt++] = cur;
     }
 
-    cc_params[cc_par_cnt++] = "compiler-rt.o";
+    cc_params[cc_par_cnt++] = path_compiler_rt;
 
     cc_params[cc_par_cnt] = NULL;
 
@@ -45,7 +64,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    find_obj();
+    find_obj(argv[0]);
     edit_params(argc, argv);
 
     execvp(cc_params[0], cc_params);

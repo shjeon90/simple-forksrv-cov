@@ -51,7 +51,6 @@ void init_forkserver() {
 
             // wait until the fuzz target is dead
             waitpid(child_pid, &status, 0);
-            printf("terminated child: %d (%d)\n", child_pid, WEXITSTATUS(status));
             
             // tell child's status to fuzzer.
             if(write(FORKSRV_FD+1, &status, sizeof(int)) != sizeof(int)) exit(1);
@@ -60,7 +59,6 @@ void init_forkserver() {
 }
 
 __attribute__((constructor)) void init_fuzz() {
-    printf("initizlie\n");
     init_shm();
     init_forkserver();
 }
